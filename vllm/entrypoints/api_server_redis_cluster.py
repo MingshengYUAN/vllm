@@ -1,6 +1,7 @@
 import argparse
 import json
 from typing import AsyncGenerator
+import logging
 
 import time
 from flasgger import Swagger
@@ -16,6 +17,21 @@ from vllm.utils import random_uuid
 
 import redis
 from rediscluster import RedisCluster, ClusterConnectionPool
+
+# 创建logger对象
+logger = logging.getLogger('mylogger')
+logger.setLevel(logging.INFO)
+# 创建FileHandler对象
+fh = logging.FileHandler('mylog.log')
+fh.setLevel(logging.INFO)
+
+# 创建Formatter对象
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+
+# 将FileHandler对象添加到Logger对象中
+logger.addHandler(fh)
+
 #构建所有的节点
 startup_nodes = [
     {"host": "192.168.0.64", "port": 6379},  # 主
@@ -36,8 +52,8 @@ startup_nodes = [
     {"host": "192.168.0.29", "port": 6379},
 ]
 #构建StrictRedisCluster对象
-redis_store = ClusterConnectionPool(startup_nodes=startup_nodes, password='0dfDF01@SA', database= 6, decode_responses=True)
-redis_pool = RedisCluster(connection_pool=redis_store)
+redis_store = ClusterConnectionPool(startup_nodes=startup_nodes, password='0dfDF01@SA', decode_responses=True)
+redis_conn = RedisCluster(connection_pool=redis_store)
 
 # redis_pool = redis.ConnectionPool(
 #     host='192.168.0.48',
@@ -63,6 +79,8 @@ class Request_1(BaseModel):
         schema_extra = {
             "example":{
                 "chat_input": "Who are you?",
+                "messages": "xxxxx",
+                "user_info": "xxxxx",
                 "id":"1c7ecc18-9f04-4261-a566-c47dfeda25f5",
                 "msg_id":"a91b38487b174b9d8c3fc34e39f767a0",
             }
@@ -106,10 +124,12 @@ async def generate(item: Request_1, request: Request) -> Response:
     if 'max_tokens' not in request_dict:
         request_dict['max_tokens'] = 512
     if 'top_p' not in request_dict:
-        request_dict['top_p'] = 0.9
+        request_dict['top_p'] = 0.7
+    prompt_new = f"<<SYS>> You are an assisante. Please answer the questions in less than 512 words <</SYS>> [INST] {prompt} [/INST]"
     sampling_params = SamplingParams(**request_dict)
     request_id = random_uuid()
-    results_generator = engine.generate(prompt, sampling_params, request_id)
+    results_generator = engine.generate(prompt_new, sampling_params, request_id)
+    logger.info(f"Input : {prompt}")
 
     # Streaming case
     async def stream_results() -> AsyncGenerator[bytes, None]:
@@ -130,19 +150,28 @@ async def generate(item: Request_1, request: Request) -> Response:
                 last_text = tmp_text_outputs
             # if len(text_outputs) > 30:
             #     text_outputs = ''
-            print(f"last_output: {last_text}")
-            print(f"text_output: {text_outputs}")
+            # print(f"last_output: {last_text}")
+            # print(f"text_output: {text_outputs}")
             # ret = {"text": request_output.outputs[-1].text}
-            
+            # print(f"<{text_outputs}> : {text_outputs.isascii()}")
+            # if len(text_outputs) == 0:
+            #     print(f'{text_outputs}')
+            #     continue
             message1 = {"chatId": chatId,"msgId": msgId, "response": text_outputs.encode('utf-8')}
             stream_name = f"momrah:sse:chat:{msgId}"
-            message1_id = redis_conn.xadd(stream_name, message1)
+            if text_outputs.isascii() and len(text_outputs) > 0:
+                # print(message1)
+                message1_id = redis_conn.xadd(stream_name, message1)
+        logger.info(f"msgId : {msgId}")
+        logger.info(f"all_output : {request_output.outputs[-1].text}")
+        # print(f"msgId : {msgId}")
+        # print(f"all_output : {request_output}")
         print(f"all_output : {request_output.outputs[-1].text}")
         # Add final signal
         final_message = {"chatId": chatId,"msgId": msgId, "response": "[\FINAL\]"}
         stream_name = f"momrah:sse:chat:{msgId}"
         message1_id = redis_conn.xadd(stream_name, final_message)
-        
+        redis_conn.expire(stream_name, 3600)
         
     if stream:
         await stream_results()

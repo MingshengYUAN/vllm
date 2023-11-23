@@ -26,7 +26,7 @@ class Request_1(BaseModel):
     class Config:
         schema_extra = {
             "example":{
-                "prompt": "<<SYS>> You are an assisante. Please answer the questions in less than 512 words <</SYS>> [INST] Who are you? [/INST]   ---OR---   Read the following paragraph and answer the question. Paragraph: My name is Richard YUAN. Question: What is my name? Answer:"
+                "prompt": "Who are you?"
             }
         }
 class no_stream_output(BaseModel):

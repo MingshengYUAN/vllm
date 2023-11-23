@@ -259,7 +259,7 @@ class AsyncLLMEngine:
                  worker_use_ray: bool,
                  engine_use_ray: bool,
                  *args,
-                 log_requests: bool = True,
+                 log_requests: bool = False,     #  log    info 
                  max_log_len: Optional[int] = None,
                  start_engine_loop: bool = True,
                  **kwargs) -> None:

@@ -28,7 +28,7 @@ class Request_1(BaseModel):
     class Config:
         schema_extra = {
             "example":{
-                "prompt": "<<SYS>> You are an assisante. Please answer the questions in less than 512 words <</SYS>> [INST] Who are you? [/INST]",
+                "prompt": "Who are you?",
                 "stream": False,
                 "max_tokens": 512,
                 "top_p": 0.9,
@@ -109,6 +109,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default=None)
     parser.add_argument("--port", type=int, default=8000)
+    # parser.add_argument("--disable-log-requests", type=bool, default=True)
     parser = AsyncEngineArgs.add_cli_args(parser)
     args = parser.parse_args()
 

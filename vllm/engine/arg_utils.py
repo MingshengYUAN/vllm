@@ -220,6 +220,7 @@ class AsyncEngineArgs(EngineArgs):
                             'separate process as the server process.')
         parser.add_argument('--disable-log-requests',
                             action='store_true',
+                            default=True
                             help='disable logging requests')
         parser.add_argument('--max-log-len',
                             type=int,
